@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel de Solturas</title>
+<style>
+:root{--bg:#0b1220;--card:#1e293b;--tx:#e2e8f0;--mut:#94a3b8;--y:#facc15;--g:#22c55e;--r:#dc2626;--p:#9333ea}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--tx);font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;display:flex;flex-direction:column;padding:8px;gap:8px}
+header{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}
+h1{font-size:20px;margin:0;font-weight:700;flex:1;min-width:180px;align-self:center}
+h1 small{display:block;font-size:13px;font-weight:500;color:var(--mut)}
+label{font-size:12px;color:var(--mut);display:flex;flex-direction:column;gap:2px}
+label.ck{flex-direction:row;align-items:center;gap:6px;font-size:13px;color:var(--tx);padding-bottom:7px}
+select,input,button{background:#1e293b;color:var(--tx);border:1px solid #334155;border-radius:6px;padding:6px 8px;font-size:14px}
+button{cursor:pointer}button:hover{background:#334155}
+.fl{font-size:12px;color:var(--mut);display:flex;flex-direction:column;gap:2px;position:relative}
+.fl .row{display:flex;align-items:center;gap:4px;color:var(--tx);font-size:13px}
+input[type=time]{color-scheme:dark;padding:5px 6px}
+.fl.dia>span{color:var(--tx);font-weight:700;font-size:13px}
+#fDia{background:#fff;color:#0b1220;color-scheme:light;font-size:18px;font-weight:700;border:2px solid #fff;padding:5px 10px;min-width:170px}
+#fDia:hover{background:#e2e8f0}
+#fDia option{font-weight:600}
+.fl.on .msb,.fl.on input[type=time]{border-color:#60a5fa}
+.msb{min-width:120px;text-align:left;display:flex;justify-content:space-between;gap:8px;max-width:220px}
+.msb span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msp{position:absolute;top:100%;left:0;z-index:20;margin-top:4px;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px;min-width:100%;max-height:60vh;overflow:auto;box-shadow:0 8px 24px #000a}
+.msp label.ck{padding:4px 6px;white-space:nowrap;border-radius:4px;cursor:pointer}
+.msp label.ck:hover{background:#1e293b}
+.msp .msa{display:flex;gap:4px;padding-bottom:6px;margin-bottom:4px;border-bottom:1px solid #334155}
+.msp .msa button{flex:1;font-size:12px;padding:4px 6px}
+.msp .vazio{font-size:12px;padding:4px 6px}
+:focus-visible{outline:2px solid #60a5fa;outline-offset:2px}
+#clock{font-variant-numeric:tabular-nums;text-align:right;line-height:1.1}
+#clock b{font-size:30px;display:block}#clock span{font-size:12px;color:var(--mut)}
+#bar{display:flex;gap:8px;flex-wrap:wrap}
+.cnt{flex:1;min-width:110px;border-radius:8px;padding:6px 10px;cursor:pointer;border:2px solid transparent;display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600}
+.cnt b{font-size:24px}.cnt.sel{border-color:#fff}
+.cnt[data-s=wait]{background:var(--card)}.cnt[data-s=ok]{background:var(--g);color:#052e16}
+.cnt[data-s=tot]{background:#1d4ed8;color:#fff}
+#warn{display:none;background:#78350f;border-radius:6px;padding:4px 10px;font-size:13px}
+#grid{flex:1;min-height:0;display:grid;gap:4px;align-content:start;justify-content:start;overflow:hidden}
+.card{border-radius:6px;padding:3px 6px;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;background:var(--card);line-height:1.05;color:#fff}
+.card .r{font-weight:700;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.card .h{display:flex;justify-content:space-between;align-items:baseline;gap:4px;font-variant-numeric:tabular-nums}
+.card .h b{font-weight:800}.card .g{opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card.ok{background:var(--g);color:#052e16}
+#empty{display:none;text-align:center;color:var(--mut);margin-top:40px}
+footer{font-size:12px;color:var(--mut);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+footer .err{color:#fca5a5}
+dialog{background:#0f172a;color:var(--tx);border:1px solid #334155;border-radius:10px;max-width:600px;width:92%}
+dialog::backdrop{background:#000a}dialog p{font-size:13px;color:var(--mut)}dialog input{width:100%;margin:4px 0 10px}
+
+#abasNav{display:flex;gap:4px;align-self:flex-end}
+#abasNav button{padding:6px 12px;font-weight:600;border-radius:6px 6px 0 0;border-bottom:3px solid transparent}
+#abasNav button.on{background:#1d4ed8;border-color:#93c5fd;color:#fff}
+body.v-evo #bar,body.v-evo #warn,body.v-evo #grid,body.v-evo #empty,body.v-evo .fl.dia,body.v-evo #fHora,body.v-evo header>label.ck{display:none!important}
+#evo{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:10px}
+#evo[hidden]{display:none}
+.kpis{display:flex;gap:8px;flex-wrap:wrap}
+.kpi{flex:1;min-width:160px;background:var(--card);border-radius:8px;padding:8px 12px}
+.kpi span{font-size:12px;color:var(--mut);display:block}.kpi b{font-size:26px;font-variant-numeric:tabular-nums}
+.kpi small{font-size:12px;color:var(--mut);margin-left:6px}
+.painelG{background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:10px}
+.painelG h2{font-size:15px;margin:0 0 6px}
+#evoSvg{width:100%;height:360px;display:block}
+#evoSvg text{fill:var(--mut);font-size:12px;font-family:inherit}
+#evoSvg .lbl{fill:var(--tx);font-weight:700;font-size:12px}
+.leg{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;margin-top:4px}
+.leg i{display:inline-block;width:18px;height:4px;border-radius:2px;vertical-align:middle;margin-right:5px}
+.tabEvo{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+.tabEvo th,.tabEvo td{padding:5px 8px;border-bottom:1px solid #1e293b;text-align:right;white-space:nowrap}
+.tabEvo th:first-child,.tabEvo td:first-child{text-align:left}
+.tabEvo th{color:var(--mut);font-weight:600;position:sticky;top:0;background:#0f172a}
+.pct-b{color:#4ade80}.pct-m{color:#facc15}.pct-r{color:#f87171}
+.nota{font-size:12px;color:var(--mut);margin:6px 0 0}
+</style>
+<style id="cssRegras"></style>
+</head>
+<body>
+<header>
+  <h1>🚌 Painel de Solturas<small id="diaPlan">Carregando planilha…</small></h1>
+  <nav id="abasNav" aria-label="Visões"><button type="button" data-v="painel" class="on">Painel</button><button type="button" data-v="evo">Evolução do check</button></nav>
+  <label class="fl dia">Data<select id="fDia" aria-label="Data da soltura"></select></label>
+  <div class="fl ms" id="fGestao" data-k="gestao"><span>Gestão</span><button type="button" class="msb" aria-haspopup="true" aria-expanded="false"><span>Todos</span>▾</button><div class="msp" hidden></div></div>
+  <div class="fl" id="fHora"><span>Intervalo de horário</span>
+    <div class="row"><input type="time" id="fIni" aria-label="Horário inicial"> às <input type="time" id="fFim" aria-label="Horário final">
+    <button type="button" id="fLimpaH" title="Limpar intervalo" aria-label="Limpar intervalo">✕</button></div></div>
+  <div class="fl ms" id="fTurno" data-k="turno"><span>Turno</span><button type="button" class="msb" aria-haspopup="true" aria-expanded="false"><span>Todos</span>▾</button><div class="msp" hidden></div></div>
+  <div class="fl ms" id="fGar" data-k="gar"><span>Garagem</span><button type="button" class="msb" aria-haspopup="true" aria-expanded="false"><span>Todos</span>▾</button><div class="msp" hidden></div></div>
+  <div class="fl ms" id="fTipo" data-k="tipo"><span>Tipo</span><button type="button" class="msb" aria-haspopup="true" aria-expanded="false"><span>Todos</span>▾</button><div class="msp" hidden></div></div>
+  <label class="ck"><input type="checkbox" id="fHideOk"> Ocultar liberados</label>
+  <button id="bFonte">⚙ Fonte dos dados</button>
+  <div id="clock"><b id="hora">--:--:--</b><span id="dataBr">Horário de Brasília</span></div>
+</header>
+<div id="bar"></div>
+<div id="warn"></div>
+<div id="grid"></div>
+<div id="empty">Nenhum roteiro para exibir com os filtros atuais.</div>
+<section id="evo" hidden>
+  <div class="kpis" id="evoKpis"></div>
+  <div class="painelG"><h2>% de roteiros com “X” no CHECK LIDER, por dia</h2>
+    <svg id="evoSvg" role="img" aria-label="Gráfico de linhas da evolução do check do líder por dia"></svg>
+    <div class="leg" id="evoLeg"></div>
+    <p class="nota">Base de cada dia: roteiros cujo horário já chegou (ou que já têm “X”). No dia de hoje, horários futuros ainda não entram na conta. Os filtros Gestão, Turno, Garagem e Tipo são aplicados.</p>
+  </div>
+  <div class="painelG"><h2>Detalhe por dia e por aba</h2><div style="overflow:auto"><table class="tabEvo" id="evoTab"></table></div></div>
+</section>
+<footer><span id="src"></span><span id="upd"></span></footer>
+
+<dialog id="dlg">
+  <h3 style="margin-top:0">Fonte dos dados</h3>
+  <p>Cole o link da planilha do Google (o mesmo da barra de endereço) e o nome da aba. A planilha precisa estar compartilhada como <b>“Qualquer pessoa com o link: Leitor”</b>.</p>
+  <label>Link da planilha<input id="iUrl"></label>
+  <label>Aba principal (horário = “Horário de garagem”)<input id="iAba"></label>
+  <label>Outras abas, separadas por ponto e vírgula (horário = “Horário inicial”)<input id="iAbas"></label>
+  <label>Atualizar a cada (segundos)<input id="iSeg" type="number" min="5" max="120"></label>
+  <p>Também aceita um link de “Publicar na Web → CSV”. Para abrir já em outra planilha, use <code>?fonte=LINK&amp;aba=NOME</code> no endereço do painel.</p>
+  <div style="display:flex;justify-content:flex-end;gap:8px">
+    <button id="bPadrao">Restaurar padrão</button>
+    <button id="bFecha">Cancelar</button>
+    <button id="bSalva">Conectar</button>
+  </div>
+</dialog>
+
+<script>
+// ===================== Configurações =====================
+const CFG={
+  PLANILHA:'https://docs.google.com/spreadsheets/d/1pK9F87DYqCGJyluifbogqKezTcf65-BaKgbFoMIsZGw/edit',
+  ABA:'SOLTURA',
+  ABAS_EXTRAS:['SOLTURA TRANSFER','SOLTURA EXTRA'], // abas extras: horário = "HORÁRIO INICIAL" (col. H), check = "CHECK LIDER" (col. N)
+  TEMPO_PRINCIPAL:['HORARIO DE GARAGEM'],
+  TEMPO_EXTRAS:['HORARIO INICIAL'],
+  COLUNA_TIPO:'B',  // coluna do filtro "Tipo" nas três abas
+  // Abas extras: as colunas são achadas pelo título; se o título não vier, usa a posição abaixo.
+  // Posições de ANTES da coluna GESTÃO (C); se a aba tiver GESTÃO, as colunas depois dela andam uma casa (H→I, N→O).
+  EXTRA_COL_HORA:'H',  // "HORÁRIO INICIAL"
+  EXTRA_COL_CHECK:'N', // "CHECK LIDER"
+  EXTRA_COL_DATA:'A',  // data (se não houver título "DATA")
+  COLUNA_GESTAO:'C',   // "GESTÃO" nas abas
+  LINHA_CABECALHO:4, // linha provável dos títulos; se mudar, o painel procura sozinho entre as linhas 1 e 15
+  INTERVALO_SEG:10,
+  ABA_REGRAS:'REGRAS', // regras dos cards lidas da aba REGRAS (A3:F14); se não der, usa REGRAS_PADRAO
+  MADRUGADA_ATE:6   // turnos NOITE com horário antes das 06:00 contam como dia seguinte
+};
+
+const $=id=>document.getElementById(id);
+const pad=n=>String(n).padStart(2,'0');
+// ===================== Regras dos cards (mesma estrutura da aba REGRAS) =====================
+// Sinal "<=" = minutos ANTES do horário; ">=" = minutos DEPOIS do horário (atraso).
+const REGRAS_PADRAO=[
+  ['Soltura','Atenção','<=','10 minutos','Horário de garagem','Amarela'],
+  ['Soltura','Atrasado','>=','0 minutos','Horário de garagem','Vermelho'],
+  ['Soltura','Crítico','>=','10 minutos','Horário de garagem','Roxo piscando'],
+  ['Soltura Transfer','Atenção','<=','10 minutos','HORARIO INICIAL','Amarela'],
+  ['Soltura Transfer','Atrasado','>=','0 minutos','HORARIO INICIAL','Vermelho'],
+  ['Soltura Transfer','Crítico','>=','10 minutos','HORARIO INICIAL','Roxo piscando'],
+  ['Soltura Extra','Atenção','<=','10 minutos','HORARIO INICIAL','Amarela'],
+  ['Soltura Extra','Atrasado','>=','0 minutos','HORARIO INICIAL','Vermelho'],
+  ['Soltura Extra','Crítico','>=','10 minutos','HORARIO INICIAL','Roxo piscando']];
+const CORES={AMAREL:'#facc15',VERMELH:'#dc2626',ROX:'#9333ea',VERDE:'#22c55e',LARANJA:'#f97316',AZUL:'#2563eb',ROSA:'#ec4899',CINZA:'#64748b',PRET:'#111827',BRANC:'#f8fafc',MARROM:'#92400e'};
+const CLARAS=['#facc15','#22c55e','#f97316','#f8fafc'];
+const slug=t=>'s_'+norm(t).replace(/[^A-Z0-9]+/g,'_').toLowerCase();
+function tempoMin(v){const s=norm(v),n=parseFloat(String(v).replace(',','.').match(/-?\d+(?:[.,]\d+)?/)?.[0]);
+  if(isNaN(n)) return null; return s.includes('HORA')?n*60:s.includes('SEG')?n/60:n;}
+let REG=null, ST=[];
+function montaRegras(linhas,fonte){
+  const porAba={}, cards=new Map();
+  for(const [aba,card,sinal,tempo,,cor] of linhas){
+    const m=tempoMin(tempo), sg=String(sinal||'').trim();
+    if(!norm(aba)||!norm(card)||m==null||!/[<>]/.test(sg)) continue;
+    const key=slug(card), lado=sg.includes('<')?'antes':'depois';
+    (porAba[norm(aba)]=porAba[norm(aba)]||[]).push({key,lado,min:m});
+    if(!cards.has(key)){
+      const c=norm(cor); let hex='#64748b'; for(const k in CORES) if(c.includes(k)){hex=CORES[k];break;}
+      cards.set(key,{key,nome:String(card).trim(),cor:hex,pisca:c.includes('PISC'),lado,min:m});
+    }
+  }
+  if(!Object.keys(porAba).length) return false;
+  // ordem dos contadores: Aguardando → avisos antes do horário (maior tempo primeiro) → atrasos (menor tempo primeiro) → Liberado
+  const lista=[...cards.values()].sort((a,b)=>a.lado!==b.lado?(a.lado==='antes'?-1:1):(a.lado==='antes'?b.min-a.min:a.min-b.min));
+  REG={porAba,cards:lista,fonte};
+  ST=[['wait','Aguardando'],...lista.map(c=>[c.key,c.nome]),['ok','Liberado ✔']];
+  $('cssRegras').textContent=lista.map(c=>{
+    const tx=CLARAS.includes(c.cor)?'#222':'#fff', esc2=`color-mix(in srgb,${c.cor} 30%,#000)`;
+    return `.cnt[data-s=${c.key}]{background:${c.cor};color:${tx}}.card.${c.key}{background:${c.cor};color:${tx}}`+
+      (c.pisca?`.card.${c.key}{animation:pk_${c.key} 1s steps(1) infinite}@keyframes pk_${c.key}{0%{background:${c.cor}}50%{background:${esc2}}}`+
+       `@media (prefers-reduced-motion:reduce){.card.${c.key}{animation:none}}`:'');
+  }).join('\n');
+  return true;
+}
+function regrasDaAba(aba){const p=REG.porAba; return p[norm(aba)]||p[norm(CFG.ABA)]||Object.values(p)[0];}
+function parseRegras(a){
+  const hi=a.findIndex(r=>r.some(c=>norm(c)==='CARD')&&r.some(c=>norm(c)==='SINAL'));
+  if(hi<0) return null;
+  const H=a[hi].map(norm), i=n=>H.indexOf(n);
+  const iA=i('ABA'),iC=i('CARD'),iS=i('SINAL'),iT=i('TEMPO'),iH=H.findIndex(h=>h.startsWith('COLUNA')),iCor=i('COR');
+  return a.slice(hi+1).map(r=>[r[iA],r[iC],r[iS],r[iT],r[iH],r[iCor]]);
+}
+async function lerRegras(link){
+  if(ehCsvPublicado(link)) return;
+  for(const l of [3,1,2]){
+    try{
+      const linhas=parseRegras(gvizMatriz(await gviz(montaUrl(link,CFG.ABA_REGRAS,l))));
+      if(linhas){ const antes=JSON.stringify(REG&&REG.porAba)+JSON.stringify(REG&&REG.cards);
+        if(montaRegras(linhas,'aba '+CFG.ABA_REGRAS)){ if(antes!==JSON.stringify(REG.porAba)+JSON.stringify(REG.cards)) render(); return; } }
+    }catch(e){}
+  }
+  if(!REG||REG.fonte!=='padrão'){ montaRegras(REGRAS_PADRAO,'padrão'); render(); }
+}
+const norm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\./g,'').replace(/\s+/g,' ').trim().toUpperCase();
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const KEY='painelSolturas_v3'; // chave nova: descarta links antigos salvos no navegador
+let S={rows:[],dia:null,upd:null,erro:null,fonte:''};
+let fSt=null, timer=null, els=[], view=[], lastKey='';
+
+// ===================== Horário de Brasília =====================
+function brNow(){
+  const p=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
+  const g=t=>+p.find(x=>x.type===t).value;
+  return {y:g('year'),m:g('month'),d:g('day'),sec:g('hour')*3600+g('minute')*60+g('second')};
+}
+const dayNum=s=>{const [y,m,d]=s.split('-').map(Number);return Date.UTC(y,m-1,d)/86400000;};
+const hoje=n=>`${n.y}-${pad(n.m)}-${pad(n.d)}`;
+const brData=s=>s?s.split('-').reverse().join('/'):'';
+
+// ===================== Leitura =====================
+function parseCSV(txt){
+  const out=[];let row=[],f='',q=false;
+  for(let i=0;i<txt.length;i++){
+    const c=txt[i];
+    if(q){ if(c==='"'){ if(txt[i+1]==='"'){f+='"';i++;} else q=false; } else f+=c; }
+    else if(c==='"') q=true;
+    else if(c===','){row.push(f);f='';}
+    else if(c==='\n'){row.push(f);out.push(row);row=[];f='';}
+    else if(c!=='\r') f+=c;
+  }
+  if(f!==''||row.length){row.push(f);out.push(row);}
+  return out;
+}
+function toSec(v){
+  const m=String(v||'').trim().match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  return m? +m[1]*3600+ +m[2]*60+(+m[3]||0) : null;
+}
+const MESES={jan:1,fev:2,mar:3,abr:4,mai:5,jun:6,jul:7,ago:8,set:9,out:10,nov:11,dez:12};
+function anoProvavel(d,m){ // data sem ano: usa o ano atual, ajustando na virada do ano
+  const n=brNow(); let y=n.y; const dif=dayNum(`${y}-${pad(m)}-${pad(d)}`)-dayNum(hoje(n));
+  if(dif<-180) y++; else if(dif>180) y--; return y;
+}
+function montaDia(y,m,d){
+  y=+y; m=+m; d=+d; if(y<100) y+=2000;
+  if(!(m>=1&&m<=12&&d>=1&&d<=31&&y>1990&&y<2100)) return null;
+  return `${y}-${pad(m)}-${pad(d)}`;
+}
+function toDia(v){
+  const s=String(v??'').trim().toLowerCase(); if(!s) return null; let m;
+  if(m=s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/)) return montaDia(m[1],m[2],m[3]);
+  if(m=s.match(/(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/)) return montaDia(m[3],m[2],m[1]);
+  if(m=s.match(/(\d{1,2})\s*(?:de\s+)?[\/\-. ]?\s*(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-zç.]*(?:\s*(?:de\s+)?[\/\-. ]?\s*(\d{2,4}))?/))
+    return montaDia(m[3]||anoProvavel(+m[1],MESES[m[2]]),MESES[m[2]],m[1]);
+  if(m=s.match(/(?:^|\D)(\d{1,2})\/(\d{1,2})(?!\d|\/\d)/)) return montaDia(anoProvavel(+m[1],+m[2]),m[2],m[1]);
+  if(m=s.match(/^(\d{5})(?:[.,]\d+)?$/)){ // número de série do Excel/Sheets
+    const n=+m[1]; if(n>36000&&n<60000){const d=new Date(Date.UTC(1899,11,30)+n*86400000);return montaDia(d.getUTCFullYear(),d.getUTCMonth()+1,d.getUTCDate());}
+  }
+  return null;
+}
+const limpa=v=>{const s=String(v??'').trim();return /^\d+\.0+$/.test(s)?s.replace(/\.0+$/,''):s;};
+
+const COLS={dia:['DATA','DIA','DATA SOLTURA','DATA DA SOLTURA','DATA OPERACAO','DATA DA OPERACAO'],cliente:['CLIENTE'],turno:['TURNO'],check:['CHECK LIDER','CHECK LÍDER'],rot:['ROTEIRO','ROTA','LINHA','ITINERARIO','DESTINO','SERVICO'],gar:['GARAGEM'],
+  carro:['CARRO'],sub:['CARRO SUB'],mot:['MOTORISTA'],motSub:['MOTORISTA SUB'],t:['HORARIO DE GARAGEM'],ini:['HORARIO DE INICIO'],
+  tel:['CONTATO'],obs:['OBSERVACAO'],gestao:['GESTAO']};
+
+function parseTabela(a,op={}){
+  const tempo=(op.tempo||CFG.TEMPO_PRINCIPAL).map(norm), extra=!!op.extra;
+  const ehCab=r=>r.some(c=>{const n=norm(c);return n==='ROTEIRO'||tempo.includes(n);});
+  const hi=a.findIndex(ehCab);
+  if(hi<0){const e=new Error(`Não encontrei o cabeçalho (coluna “${extra?'HORÁRIO INICIAL':'ROTEIRO'}”) na aba.`);e.semCab=true;throw e;}
+  const H=a[hi].map(norm), ix={};
+  for(const k in COLS) ix[k]=H.findIndex(h=>COLS[k].map(norm).includes(h));
+  ix.t=H.findIndex(h=>tempo.includes(h));
+  const iTipo=(CFG.COLUNA_TIPO.toUpperCase().charCodeAt(0)-65);
+  if(ix.t<0){
+    const e=new Error(extra?'não tem a coluna “HORÁRIO INICIAL” (o nome da aba pode estar diferente na planilha).':'Faltam as colunas “ROTEIRO” ou “Horario de garagem” no cabeçalho.');
+    if(extra) e.semCab=true; throw e;
+  }
+  if(!extra&&ix.rot<0) throw new Error('Faltam as colunas “ROTEIRO” ou “Horario de garagem” no cabeçalho.');
+  const g=(r,k)=>ix[k]<0?'':limpa(r[ix[k]]);
+  const rows=[], dias={}; let ultimoDia=null, semData=0;
+  for(let i=hi+1;i<a.length;i++){
+    const r=a[i]; const tipo=limpa(r[iTipo]);
+    if(ehCab(r)) continue; // cabeçalho repetido no meio da aba
+    let t=toSec(g(r,'t')); if(t===null) continue;
+    const rot=g(r,'rot')||(extra?(g(r,'cliente')||tipo):''); if(!rot) continue;
+    const turno=g(r,'turno');
+    if(norm(turno).includes('NOITE') && t<CFG.MADRUGADA_ATE*3600) t+=86400;
+    // célula de DATA vazia (ex.: células mescladas) herda a data da linha de cima
+    let dia=toDia(g(r,'dia'));
+    if(dia){ultimoDia=dia;} else {dia=ultimoDia; semData++;}
+    if(dia) dias[dia]=(dias[dia]||0)+1;
+    rows.push({dia,turno,ok:norm(g(r,'check'))==='X',rot,gar:g(r,'gar'),carro:g(r,'carro'),sub:g(r,'sub'),
+      mot:g(r,'mot'),motSub:g(r,'motSub'),t,tel:g(r,'tel'),obs:g(r,'obs'),cliente:g(r,'cliente'),gestao:g(r,'gestao'),tipo,aba:op.aba||'',temGestao:ix.gestao>=0});
+  }
+  const dia=Object.entries(dias).sort((x,y)=>y[1]-x[1])[0]?.[0]||null;
+  rows.forEach(r=>{if(!r.dia) r.dia=dia;});
+  return {rows,dia,semData,colData:ix.dia>=0};
+}
+
+const ehCsvPublicado=link=>/\/pub(html)?\?|output=csv|tqx=out:csv/.test(link);
+function montaUrl(link,aba,linha){
+  link=link.trim();
+  if(ehCsvPublicado(link)) return link;
+  const id=(link.match(/\/d\/([a-zA-Z0-9-_]{20,})/)||[])[1]||link;
+  return `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?headers=1&sheet=${encodeURIComponent(aba)}&range=A${linha}:Z`;
+}
+function conf(){
+  const q=new URLSearchParams(location.search);
+  let c={}; try{c=JSON.parse(localStorage.getItem(KEY)||'{}');}catch(e){}
+  const ex=q.get('abas')??c.abasExtras;
+  return {link:q.get('fonte')||c.link||CFG.PLANILHA, aba:q.get('aba')||c.aba||CFG.ABA, seg:+(q.get('seg')||c.seg||CFG.INTERVALO_SEG),
+    extras:ex==null?CFG.ABAS_EXTRAS.slice():String(ex).split(';').map(x=>x.trim()).filter(Boolean)};
+}
+
+async function baixar(url){
+  const r=await fetch(url+(url.includes('?')?'&':'?')+'_='+Date.now(),{cache:'no-store'});
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const txt=await r.text();
+  if(/^\s*<!doctype html|<html/i.test(txt)) throw new Error('a planilha não está compartilhada como “Qualquer pessoa com o link”.');
+  return txt;
+}
+// Leitura via <script> (JSONP): não depende de CORS, funciona abrindo o arquivo direto do computador
+let nJsonp=0;
+function gviz(url){
+  return new Promise((res,rej)=>{
+    const cb='__gviz'+(++nJsonp)+'_'+Date.now(), s=document.createElement('script');
+    let feito=false;
+    const fim=()=>{feito=true;clearTimeout(t);try{delete window[cb];}catch(e){window[cb]=undefined;}s.remove();};
+    const erro=m=>{if(!feito){fim();rej(new Error(m));}};
+    const t=setTimeout(()=>erro('o Google não respondeu em 25 s. Verifique a internet.'),25000);
+    window[cb]=d=>{if(!feito){fim();res(d);}};
+    s.onload=()=>setTimeout(()=>erro('o Google não devolveu os dados. Confira se a planilha está como “Qualquer pessoa com o link: Leitor”.'),0);
+    s.onerror=()=>erro('não consegui acessar o Google Planilhas. Verifique a internet ou se a rede da empresa bloqueia o acesso.');
+    s.src=url+'&tqx='+encodeURIComponent('out:json;responseHandler:'+cb)+'&_='+Date.now();
+    document.head.appendChild(s);
+  });
+}
+function valorGviz(c){
+  if(!c) return '';
+  const v=c.v;
+  const dt=typeof v==='string'&&v.match(/^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+))?/);
+  if(dt&&+dt[1]>1900&&!(+dt[4]||+dt[5])) return `${dt[1]}-${pad(+dt[2]+1)}-${pad(dt[3])}`; // data pura: usa o valor real, não o formato exibido
+  if(c.f!=null&&c.f!=='') return String(c.f);
+  if(v==null) return '';
+  if(Array.isArray(v)) return v.slice(0,3).map(pad).join(':');
+  const m=String(v).match(/^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+)(?:,(\d+))?)?/);
+  if(m){
+    const hora=m[4]!=null?`${pad(m[4])}:${pad(m[5])}:${pad(m[6]||0)}`:'';
+    if(+m[1]<=1900) return hora;
+    return `${m[1]}-${pad(+m[2]+1)}-${pad(m[3])}`+(hora?' '+hora:'');
+  }
+  return String(v);
+}
+function gvizMatriz(d){
+  if(!d||d.status==='error'){
+    const e=(d&&d.errors&&d.errors[0])||{};
+    throw new Error('o Google recusou a leitura: '+(e.detailed_message||e.message||'erro desconhecido'));
+  }
+  const cols=d.table.cols, out=[cols.map(c=>c.label||'')];
+  for(const r of d.table.rows) out.push(cols.map((_,i)=>valorGviz(r.c&&r.c[i])));
+  return out;
+}
+
+// ----- Abas extras (TRANSFER / EXTRA): leitura pela POSIÇÃO das colunas, pois os títulos são diferentes -----
+const colIdx=L=>String(L).trim().toUpperCase().charCodeAt(0)-65;
+function parseExtra(a,aba){
+  const iTipo=colIdx(CFG.COLUNA_TIPO);
+  const marca=['HORARIO INICIAL','CHECK LIDER','ROTEIRO','TIPO','DATA','GESTAO'];
+  const hi=a.findIndex(r=>r.filter(c=>marca.includes(norm(c))).length>=2);
+  const H=hi<0?[]:a[hi].map(norm), ix={};
+  for(const k in COLS) ix[k]=H.findIndex(h=>COLS[k].map(norm).includes(h));
+  // GESTÃO: pelo título; senão, pela coluna C se ali houver texto que não seja data/hora
+  const iGC=colIdx(CFG.COLUNA_GESTAO);
+  const temGestao=ix.gestao>=0||H[iGC]==='GESTAO';
+  if(ix.gestao<0&&temGestao) ix.gestao=iGC;
+  const desloca=p=>{const i=colIdx(p); return temGestao&&(ix.gestao<=i)?i+1:i;};
+  const pH=H.indexOf('HORARIO INICIAL'), pC=H.findIndex(h=>COLS.check.map(norm).includes(h));
+  const iT=pH>=0?pH:desloca(CFG.EXTRA_COL_HORA), iCk=pC>=0?pC:desloca(CFG.EXTRA_COL_CHECK);
+  const iDia=ix.dia>=0?ix.dia:colIdx(CFG.EXTRA_COL_DATA), cab=hi>=0?a[hi]:[];
+  const g=(r,k)=>ix[k]<0?'':limpa(r[ix[k]]);
+  const rows=[]; let ultimoDia=null, semData=0;
+  for(let i=hi+1;i<a.length;i++){
+    const r=a[i]; if(!r) continue;
+    const t=toSec(limpa(r[iT])); if(t===null) continue;
+    const tipo=limpa(r[iTipo]);
+    let dia=toDia(limpa(r[iDia]));
+    if(dia) ultimoDia=dia; else {dia=ultimoDia; semData++;}
+    const rot=g(r,'rot')||g(r,'cliente')||tipo||aba;
+    // dica do cursor: todas as colunas preenchidas desta aba, com o título da própria aba
+    const campos=r.map((v,j)=>{let x=limpa(v); if(/^\d{1,2}:\d{2}:00$/.test(x)) x=x.slice(0,-3);
+      return [limpa(cab[j])||'Coluna '+String.fromCharCode(65+j),x];}).filter(([,x])=>x);
+    rows.push({campos,dia,turno:g(r,'turno'),ok:norm(limpa(r[iCk]))==='X',rot,gar:g(r,'gar'),carro:g(r,'carro'),sub:g(r,'sub'),
+      mot:g(r,'mot'),motSub:g(r,'motSub'),t,tel:g(r,'tel'),obs:g(r,'obs'),cliente:g(r,'cliente'),gestao:g(r,'gestao'),tipo,aba,extra:true,temGestao});
+  }
+  return {rows,semData,cols:{hora:iT,check:iCk,gestao:ix.gestao}};
+}
+const linhasChave=m=>new Set(m.map(r=>r.map(c=>String(c??'').trim())).filter(r=>r.filter(Boolean).length>=3).map(r=>r.join('\u0001')));
+function repetida(mat,base){ // aba inexistente: o Google devolve outra aba no lugar
+  const k=[...linhasChave(mat)]; if(k.length<3) return false;
+  return base.some(b=>k.filter(x=>b.has(x)).length/k.length>0.8);
+}
+const falhaAte={}; // aba extra que falhou: espera 5 min antes de tentar de novo
+async function lerTabela(link,aba,op){
+  if(ehCsvPublicado(link)) return parseTabela(parseCSV(await baixar(link)),op);
+  const kL='painelLinha:'+link+'|'+aba, salva=+localStorage.getItem(kL)||0;
+  const linhas=[...new Set([salva,CFG.LINHA_CABECALHO,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].filter(Boolean))];
+  for(const l of linhas){
+    try{
+      const mat=gvizMatriz(await gviz(montaUrl(link,aba,l)));
+      const res=parseTabela(mat,op); res.mat=mat;
+      if(l!==salva) try{localStorage.setItem(kL,l);}catch(e){}
+      return res;
+    }catch(e){ if(!e.semCab) throw e; }
+  }
+  throw new Error(op.extra?'não encontrei a coluna “HORÁRIO INICIAL” nas linhas 1 a 15 — confira o nome da aba.'
+    :`não encontrei a coluna “ROTEIRO” nas linhas 1 a 15 da aba “${aba}”. Confira o nome da aba e o título da coluna.`);
+}
+const assinatura=rows=>JSON.stringify(rows.map(r=>[r.dia,r.rot,r.t,r.tipo,r.ok]));
+async function ler(){
+  const c=conf();
+  lerRegras(c.link); // em paralelo; mantém as regras atuais se a aba REGRAS não responder
+  try{
+    const princ=await lerTabela(c.link,c.aba,{aba:c.aba,tempo:CFG.TEMPO_PRINCIPAL});
+    const usaExtras=!ehCsvPublicado(c.link);
+    const extras=usaExtras?await Promise.all(c.extras.map(async aba=>{
+      try{ return {aba,mat:gvizMatriz(await gviz(montaUrl(c.link,aba,1)))}; }
+      catch(e){ return {aba,erro:e.message}; }
+    })):[];
+    const bases=[linhasChave(princ.mat||[])], avisos=[], resumo=[`${c.aba} ${princ.rows.length}`];
+    let rows=princ.rows.slice(), semData=princ.semData;
+    for(const x of extras){
+      if(x.erro){avisos.push(`aba “${x.aba}”: ${x.erro}`);continue;}
+      if(repetida(x.mat,bases)){avisos.push(`aba “${x.aba}” não encontrada — confira o nome em ⚙ Fonte dos dados`);continue;}
+      bases.push(linhasChave(x.mat));
+      const res=parseExtra(x.mat,x.aba);
+      rows=rows.concat(res.rows); semData+=res.semData; resumo.push(`${x.aba} ${res.rows.length}`);
+      if(!res.rows.length) avisos.push(`aba “${x.aba}”: nenhum horário encontrado na coluna ${CFG.EXTRA_COL_HORA}`);
+    }
+    const dias={}; rows.forEach(r=>{if(r.dia) dias[r.dia]=(dias[r.dia]||0)+1;});
+    const dia=Object.entries(dias).sort((x,y)=>y[1]-x[1])[0]?.[0]||null;
+    S={...S,rows,dia,semData,colData:princ.colData,avisosAbas:avisos,upd:new Date(),erro:null,fonte:`Google Planilhas · horários lidos: ${resumo.join(' · ')}`};
+    fillFiltros(); render();
+  }catch(e){
+    S.erro='⚠ Falha ao ler a planilha: '+(e.message||'verifique conexão e compartilhamento')+(S.upd?' — mostrando a última leitura.':'');
+    head();
+  }
+}
+function iniciar(){ clearInterval(timer); ler(); timer=setInterval(ler,Math.max(5,conf().seg)*1000); }
+
+// ===================== Status =====================
+function restante(r,now){ return r.t-now.sec+(dayNum(r.dia||hoje(now))-dayNum(hoje(now)))*86400; }
+function status(r,now){
+  if(r.ok) return 'ok';
+  const rem=restante(r,now), atraso=-rem/60; // minutos depois do horário (negativo = ainda não chegou)
+  const rg=regrasDaAba(r.aba)||[];
+  let melhor=null;
+  for(const x of rg) if(x.lado==='depois'&&atraso>=x.min&&(!melhor||x.min>melhor.min)) melhor=x;
+  if(melhor) return melhor.key;
+  for(const x of rg) if(x.lado==='antes'&&rem>0&&rem/60<=x.min&&(!melhor||x.min<melhor.min)) melhor=x;
+  return melhor?melhor.key:'wait';
+}
+const fmtHM=s=>{s=((s%86400)+86400)%86400;return pad(Math.floor(s/3600))+':'+pad(Math.floor(s%3600/60));};
+function fmtRem(rem){const a=Math.abs(rem),h=Math.floor(a/3600),m=Math.floor(a%3600/60),s=a%60;return (rem<0?'+':'−')+(h?h+':'+pad(m):pad(m))+':'+pad(s);}
+
+// ===================== Interface =====================
+// ----- Filtros (seleção múltipla + intervalo de horário), lembrados no navegador -----
+const lerLS=(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v??d;}catch(e){return d;}};
+const gravaLS=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}};
+const FSEL={turno:new Set(lerLS('painelF_turno',[])),gar:new Set(lerLS('painelF_gar',[])),tipo:new Set(lerLS('painelF_tipo',[])),gestao:new Set(lerLS('painelF_gestao',[]))};
+const msChave={};
+function msRotulo(box){
+  const sel=[...FSEL[box.dataset.k]], b=box.querySelector('.msb');
+  b.firstElementChild.textContent=!sel.length?'Todos':sel.length===1?sel[0]:sel.length+' selecionados';
+  b.title=sel.length?sel.join(', '):'Todos';
+  box.classList.toggle('on',sel.length>0);
+}
+function msMonta(box,vals){
+  const k=box.dataset.k, todos=[...new Set([...vals,...FSEL[k]])].sort((a,b)=>a.localeCompare(b,'pt',{numeric:true}));
+  const chave=todos.join('\u0001')+'|'+[...FSEL[k]].join('\u0001');
+  if(msChave[k]!==chave){
+    msChave[k]=chave;
+    box.querySelector('.msp').innerHTML=`<div class="msa"><button type="button" data-a="todos">Marcar todos</button><button type="button" data-a="limpa">Limpar</button></div>`+
+      (todos.length?todos.map(v=>`<label class="ck"><input type="checkbox" value="${esc(v)}"${FSEL[k].has(v)?' checked':''}> ${esc(v)}</label>`).join(''):'<div class="vazio">Sem opções na planilha</div>');
+  }
+  msRotulo(box);
+}
+// ----- Filtro de DATA: "auto" = hoje (ou a próxima data da planilha), "*" = todas -----
+// escolha manual vale até a meia-noite; no dia seguinte volta para a data atual
+let fDiaSel=(()=>{const x=lerLS('painelF_dia',null);return x&&x.em===hoje(brNow())&&x.v!=='*'?x.v:'auto';})(), diaChave='', diaSistema=hoje(brNow());
+const diasDisp=()=>[...new Set(S.rows.map(r=>r.dia).filter(Boolean))].sort();
+function diaAuto(){const ds=diasDisp(), h=hoje(brNow()); if(ds.includes(h)) return h; return ds.find(d=>d>h)||ds[ds.length-1]||null;}
+function diaAtivo(){ if(fDiaSel!=='auto'&&diasDisp().includes(fDiaSel)) return fDiaSel; return diaAuto(); }
+const daData=(r,da)=>da==='*'||!da||r.dia===da;
+function fillDias(){
+  // a lista mostra apenas as datas existentes na coluna DATA da planilha
+  const ds=diasDisp(), h=hoje(brNow()), val=diaAtivo()||'', sel=$('fDia');
+  const chave=ds.join(',')+'|'+h+'|'+val;
+  if(chave===diaChave) return; diaChave=chave;
+  sel.innerHTML=ds.length?ds.map(d=>`<option value="${d}">${brData(d)}${d===h?' (hoje)':''}</option>`).join(''):'<option value="">Sem datas</option>';
+  sel.value=val;
+}
+function fillFiltros(){
+  fillDias();
+  const da=diaAtivo(), base=S.rows.filter(r=>daData(r,da));
+  msMonta($('fTurno'),[...new Set(base.filter(r=>!r.extra).map(r=>r.turno).filter(Boolean))]);
+  msMonta($('fGar'),[...new Set(base.filter(r=>!r.extra).map(r=>r.gar).filter(Boolean))]);
+  msMonta($('fGestao'),[...new Set(base.map(r=>r.gestao).filter(Boolean))]);
+  msMonta($('fTipo'),[...new Set(base.map(r=>r.tipo).filter(Boolean))]);
+}
+function msFecha(box){box.querySelector('.msp').hidden=true;box.querySelector('.msb').setAttribute('aria-expanded','false');}
+document.querySelectorAll('.ms').forEach(box=>{
+  const k=box.dataset.k, p=box.querySelector('.msp'), b=box.querySelector('.msb');
+  b.onclick=()=>{const abrir=p.hidden; document.querySelectorAll('.ms').forEach(msFecha); if(abrir){p.hidden=false;b.setAttribute('aria-expanded','true');}};
+  p.onchange=e=>{const c=e.target; if(c.type!=='checkbox') return; c.checked?FSEL[k].add(c.value):FSEL[k].delete(c.value); salvaFiltro(k); msRotulo(box); render();};
+  p.onclick=e=>{const a=e.target.dataset&&e.target.dataset.a; if(!a) return;
+    const cks=[...p.querySelectorAll('input[type=checkbox]')];
+    cks.forEach(c=>{c.checked=a==='todos'; a==='todos'?FSEL[k].add(c.value):FSEL[k].delete(c.value);});
+    if(a==='limpa') FSEL[k].clear();
+    salvaFiltro(k); msRotulo(box); render();};
+});
+document.addEventListener('click',e=>{document.querySelectorAll('.ms').forEach(box=>{if(!box.contains(e.target)) msFecha(box);});});
+document.addEventListener('keydown',e=>{if(e.key==='Escape') document.querySelectorAll('.ms').forEach(msFecha);});
+function salvaFiltro(k){gravaLS('painelF_'+k,[...FSEL[k]]);}
+const hmSeg=v=>{const m=/^(\d{1,2}):(\d{2})/.exec(v||'');return m?(+m[1])*3600+(+m[2])*60:null;};
+function noIntervalo(r){
+  const ini=hmSeg($('fIni').value), fim=hmSeg($('fFim').value);
+  if(ini==null&&fim==null) return true;
+  const t=((r.t%86400)+86400)%86400, f=fim==null?null:fim+59;
+  if(ini!=null&&f!=null) return ini<=f?(t>=ini&&t<=f):(t>=ini||t<=f); // ex.: 22:00 às 02:00 atravessa a meia-noite
+  return ini!=null?t>=ini:t<=f;
+}
+function horaOn(){$('fHora').classList.toggle('on',!!($('fIni').value||$('fFim').value));}
+function head(){
+  const da=diaAtivo(), nDia=S.rows.filter(r=>daData(r,da)).length;
+  $('diaPlan').textContent=S.rows.length?(da==='*'?`Todas as datas · ${nDia} roteiros`:`Soltura de ${brData(da)} · ${nDia} roteiros`):(S.erro?'Sem dados':(S.upd?'Nenhum roteiro na planilha':'Carregando planilha…'));
+  const src=$('src'); src.textContent=S.erro||(S.fonte+` · regras: ${REG.fonte}`+(S.semData?` · ${S.semData} linha(s) sem DATA preenchida: usei a data da linha de cima`:'')+((S.avisosAbas||[]).length?' · ⚠ '+S.avisosAbas.join(' · '):'')); src.className=S.erro?'err':'';
+  $('upd').textContent=S.upd?'Última leitura: '+S.upd.toLocaleTimeString('pt-BR',{timeZone:'America/Sao_Paulo'}):'';
+  const n=brNow(), w=$('warn'), h=hoje(n), dif=da&&da!=='*'&&da!==h;
+  const avisos=[];
+  if(dif) avisos.push(fDiaSel==='auto'
+    ?`Atenção: a planilha não tem roteiros para hoje (${brData(h)}). Exibindo a soltura de ${brData(da)}.`
+    :`Atenção: exibindo a soltura de ${brData(da)}, que não é hoje (${brData(h)}).`);
+  if(S.rows.length&&S.colData===false) avisos.push('Não encontrei a coluna “DATA” no cabeçalho: não é possível separar os dias.');
+  w.style.display=avisos.length?'block':'none';
+  w.innerHTML=avisos.map(esc).join('<br>');
+}
+let visao=lerLS('painelVisao','painel');
+function trocaVisao(v){
+  visao=v==='evo'?'evo':'painel'; gravaLS('painelVisao',visao);
+  document.body.classList.toggle('v-evo',visao==='evo'); $('evo').hidden=visao!=='evo';
+  document.querySelectorAll('#abasNav button').forEach(b=>{b.classList.toggle('on',b.dataset.v===visao);b.setAttribute('aria-pressed',b.dataset.v===visao);});
+  lastKey=''; render();
+}
+document.querySelectorAll('#abasNav button').forEach(b=>b.onclick=()=>trocaVisao(b.dataset.v));
+addEventListener('resize',()=>{if(visao==='evo') desenhaEvo();});
+
+// ===================== Evolução do check do líder =====================
+const CORES_SERIE=['#38bdf8','#f472b6','#a3e635','#fb923c','#c084fc','#2dd4bf'];
+const fmtPct=x=>x==null?'—':(x*100).toFixed(1).replace('.',',')+'%';
+const clsPct=x=>x==null?'':x>=.95?'pct-b':x>=.8?'pct-m':'pct-r';
+function dadosEvo(){
+  const tu=FSEL.turno, ga=FSEL.gar, ti=FSEL.tipo, ge=FSEL.gestao, now=brNow();
+  const rows=S.rows.filter(r=>r.dia&&(!tu.size||r.extra||tu.has(r.turno))&&(!ga.size||r.extra||ga.has(r.gar))&&(!ti.size||ti.has(r.tipo))&&(!ge.size||!r.temGestao||ge.has(r.gestao)));
+  const dias=[...new Set(rows.map(r=>r.dia))].sort(), abas=[...new Set(rows.map(r=>r.aba))];
+  const conta={}; // conta[aba|'Geral'][dia]={ok,base,total}
+  for(const r of rows){
+    const venceu=restante(r,now)<=0;
+    for(const k of [r.aba,'Geral']){
+      const c=((conta[k]=conta[k]||{})[r.dia]=conta[k][r.dia]||{ok:0,base:0,total:0});
+      c.total++; if(venceu||r.ok){c.base++; if(r.ok) c.ok++;}
+    }
+  }
+  return {dias,abas,conta,hoje:hoje(now)};
+}
+function desenhaEvo(){
+  const {dias,abas,conta,hoje:h}=dadosEvo(), svg=$('evoSvg');
+  const series=[...abas.map((a,i)=>({nome:a,cor:CORES_SERIE[i%CORES_SERIE.length],larg:2.5})),{nome:'Geral',cor:'#f8fafc',larg:4}];
+  const pct=(k,d)=>{const c=conta[k]&&conta[k][d]; return c&&c.base?c.ok/c.base:null;};
+  // indicadores
+  const soma=k=>dias.reduce((a,d)=>{const c=conta[k]&&conta[k][d];if(c){a.ok+=c.ok;a.base+=c.base;}return a;},{ok:0,base:0});
+  const g=soma('Geral'), cH=conta.Geral&&conta.Geral[h], dAnt=dias.filter(d=>d<h).pop(), cA=dAnt&&conta.Geral[dAnt];
+  $('evoKpis').innerHTML=[
+    ['Geral do período',g.base?g.ok/g.base:null,`${g.ok} de ${g.base}`],
+    [`Hoje (${brData(h).slice(0,5)})`,cH&&cH.base?cH.ok/cH.base:null,cH?`${cH.ok} de ${cH.base}`:'sem roteiros'],
+    [dAnt?`Dia anterior (${brData(dAnt).slice(0,5)})`:'Dia anterior',cA&&cA.base?cA.ok/cA.base:null,cA?`${cA.ok} de ${cA.base}`:'—'],
+    ['Sem “X” no período',null,'',g.base-g.ok]
+  ].map(([t,v,sub,n])=>`<div class="kpi"><span>${esc(t)}</span><b class="${n==null?clsPct(v):''}">${n==null?fmtPct(v):n}</b><small>${esc(sub)}</small></div>`).join('');
+  // gráfico
+  const W=Math.max(320,svg.clientWidth||800), Hh=360, m={l:48,r:20,t:22,b:34}, iw=W-m.l-m.r, ih=Hh-m.t-m.b;
+  svg.setAttribute('viewBox',`0 0 ${W} ${Hh}`);
+  if(!dias.length){svg.innerHTML=`<text x="${W/2}" y="${Hh/2}" text-anchor="middle">Sem dados com os filtros atuais.</text>`;$('evoLeg').innerHTML='';$('evoTab').innerHTML='';return;}
+  const x=i=>m.l+(dias.length===1?iw/2:i*iw/(dias.length-1)), y=v=>m.t+ih*(1-v);
+  let o='';
+  for(let v=0;v<=1.0001;v+=.2) o+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(v)}" y2="${y(v)}" stroke="#1e293b"/><text x="${m.l-8}" y="${y(v)+4}" text-anchor="end">${Math.round(v*100)}%</text>`;
+  const passo=Math.ceil(dias.length/Math.max(1,Math.floor(iw/70)));
+  dias.forEach((d,i)=>{ if(i%passo===0||i===dias.length-1) o+=`<text x="${x(i)}" y="${Hh-10}" text-anchor="${dias.length>1&&i===dias.length-1?'end':dias.length>1&&i===0?'start':'middle'}">${brData(d).slice(0,5)}${d===h?' (hoje)':''}</text>`; });
+  for(const s of series){
+    let path='', pts='';
+    dias.forEach((d,i)=>{const v=pct(s.nome,d); if(v==null){return;}
+      path+=(path?'L':'M')+x(i).toFixed(1)+','+y(v).toFixed(1);
+      const c=conta[s.nome][d];
+      pts+=`<circle cx="${x(i)}" cy="${y(v)}" r="${s.nome==='Geral'?5:4}" fill="${s.cor}" stroke="#0f172a" stroke-width="1.5"><title>${brData(d)} · ${esc(s.nome)}: ${c.ok} de ${c.base} com X (${fmtPct(v)})${c.total>c.base?` · ${c.total-c.base} ainda não chegaram no horário`:''}</title></circle>`;
+      if(s.nome==='Geral') pts+=`<text class="lbl" x="${x(i)}" y="${y(v)-10}" text-anchor="middle">${fmtPct(v)}</text>`;
+    });
+    o+=`<path d="${path}" fill="none" stroke="${s.cor}" stroke-width="${s.larg}" stroke-linejoin="round" stroke-linecap="round"/>`+pts;
+  }
+  svg.innerHTML=o;
+  $('evoLeg').innerHTML=series.map(s=>`<span><i style="background:${s.cor}"></i>${esc(s.nome)}</span>`).join('');
+  // tabela (dia mais recente primeiro)
+  const cel=(k,d)=>{const c=conta[k]&&conta[k][d]; if(!c) return '<td>—</td>'; const v=c.base?c.ok/c.base:null;
+    return `<td title="${c.total} roteiros no dia">${c.ok}/${c.base} <b class="${clsPct(v)}">${fmtPct(v)}</b></td>`;};
+  $('evoTab').innerHTML=`<thead><tr><th>Data</th>${abas.map(a=>`<th>${esc(a)}</th>`).join('')}<th>Geral</th></tr></thead><tbody>`+
+    dias.slice().reverse().map(d=>`<tr><td>${brData(d)}${d===h?' (hoje)':''}</td>${abas.map(a=>cel(a,d)).join('')}${cel('Geral',d)}</tr>`).join('')+'</tbody>';
+}
+
+function render(){
+  if(visao==='evo'){ head(); desenhaEvo(); return; }
+  const tu=FSEL.turno, ga=FSEL.gar, ti=FSEL.tipo, ge=FSEL.gestao, da=diaAtivo();
+  view=S.rows.filter(r=>daData(r,da)&&(!tu.size||r.extra||tu.has(r.turno))&&(!ga.size||r.extra||ga.has(r.gar))&&(!ti.size||ti.has(r.tipo))&&(!ge.size||!r.temGestao||ge.has(r.gestao))&&noIntervalo(r))
+    .sort((a,b)=>(a.dia||'').localeCompare(b.dia||'')||a.t-b.t||a.rot.localeCompare(b.rot,'pt',{numeric:true}));
+  $('bar').innerHTML=ST.map(([k,n])=>`<div class="cnt${fSt===k?' sel':''}" data-s="${k}" tabindex="0"><span>${n}</span><b id="c_${k}">0</b></div>`).join('')+
+    `<div class="cnt${fSt?'':' sel'}" data-s="tot" tabindex="0" title="Total de roteiros da data selecionada (com os filtros aplicados). Clique para mostrar todos."><span>Total do dia</span><b id="c_tot">0</b></div>`;
+  document.querySelectorAll('.cnt').forEach(c=>{
+    const f=()=>{fSt=c.dataset.s==='tot'||fSt===c.dataset.s?null:c.dataset.s;render();};
+    c.onclick=f; c.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();f();}};
+  });
+  head(); tick(true);
+}
+function layout(list){
+  const g=$('grid'); g.innerHTML=''; els=[];
+  $('empty').style.display=list.length||!S.upd?'none':'block';
+  if(!list.length) return;
+  const W=g.clientWidth,H=g.clientHeight,n=list.length,gap=4,ratio=2.1;
+  let best=1,bs=0;
+  for(let c=1;c<=n;c++){const cw=W/c-gap,ch=H/Math.ceil(n/c)-gap,s=Math.min(cw/ratio,ch); if(s>bs){bs=s;best=c;}}
+  const ch=Math.min(bs,110),cw=Math.min(W/best-gap,ch*3.2);
+  g.style.gridTemplateColumns=`repeat(${best},${cw}px)`; g.style.gridAutoRows=ch+'px';
+  const todas=diaAtivo()==='*';
+  list.forEach(r=>{
+    const e=document.createElement('div'); e.className='card wait';
+    e.style.fontSize=Math.max(8,ch*0.2)+'px';
+    e.title=r.extra?[r.rot,`Aba: ${r.aba}`,...(r.campos||[]).map(([h,v])=>`${h}: ${v}`)].join('\n'):[r.rot,`Aba: ${r.aba}`,r.gestao?`Gestão: ${r.gestao}`:'',r.tipo?`Tipo: ${r.tipo}`:'',`Data: ${brData(r.dia)}`,`Turno: ${r.turno}`,`Garagem: ${r.gar}`,`Carro: ${r.carro}${r.sub?' (sub: '+r.sub+')':''}`,
+      `Motorista: ${r.mot}${r.motSub?' (sub: '+r.motSub+')':''}`,`Contato: ${r.tel}`,r.obs?`Obs.: ${r.obs}`:''].filter(Boolean).join('\n');
+    e.innerHTML=`<div class="r">${esc(r.rot)}</div><div class="h"><b style="font-size:1.25em">${fmtHM(r.t)}</b><span class="t"></span></div>`+
+      (ch>=58?`<div class="g">${[todas?brData(r.dia).slice(0,5):'',r.sub||r.carro,r.gar].filter(Boolean).map(esc).join(' · ')}</div>`:'');
+    g.appendChild(e); els.push(e);
+  });
+}
+function tick(force){
+  const now=brNow();
+  if(hoje(now)!==diaSistema){ // virou a meia-noite
+    diaSistema=hoje(now); fDiaSel='auto'; gravaLS('painelF_dia',null); diaChave=''; fillFiltros(); render(); return;
+  }
+  $('hora').textContent=`${pad(Math.floor(now.sec/3600))}:${pad(Math.floor(now.sec%3600/60))}:${pad(now.sec%60)}`;
+  $('dataBr').textContent=`${pad(now.d)}/${pad(now.m)}/${now.y} · Horário de Brasília`;
+  if(visao==='evo'){ if(now.sec%60===0) desenhaEvo(); return; }
+  const cnt=Object.fromEntries(ST.map(([k])=>[k,0])), sts=view.map(r=>{const s=status(r,now);cnt[s]=(cnt[s]||0)+1;return s;});
+  ST.forEach(([k])=>{const c=$('c_'+k); if(c) c.textContent=cnt[k];});
+  if($('c_tot')) $('c_tot').textContent=view.length;
+  const hide=$('fHideOk').checked;
+  const list=view.map((r,i)=>[r,sts[i]]).filter(x=>fSt?x[1]===fSt:!(hide&&x[1]==='ok'));
+  const key=list.map(x=>x[0].aba+x[0].rot+x[0].t+x[0].carro+x[0].sub).join('|')+'|'+innerWidth+'x'+innerHeight;
+  if(force||key!==lastKey){ lastKey=key; layout(list.map(x=>x[0])); }
+  list.forEach(([r,s],i)=>{
+    const e=els[i]; if(!e) return;
+    const cls='card '+s; if(e.className!==cls) e.className=cls;
+    const t=e.querySelector('.t');
+    const txt=s==='ok'?'✔':s==='wait'?'':fmtRem(restante(r,now));
+    if(t.textContent!==txt) t.textContent=txt;
+  });
+}
+
+// ===================== Eventos =====================
+$('bFonte').onclick=()=>{const c=conf(); $('iUrl').value=c.link; $('iAba').value=c.aba; $('iAbas').value=c.extras.join('; '); $('iSeg').value=c.seg; $('dlg').showModal();};
+$('bFecha').onclick=()=>$('dlg').close();
+$('bPadrao').onclick=()=>{$('iUrl').value=CFG.PLANILHA; $('iAba').value=CFG.ABA; $('iAbas').value=CFG.ABAS_EXTRAS.join('; '); $('iSeg').value=CFG.INTERVALO_SEG;};
+$('bSalva').onclick=()=>{
+  const link=$('iUrl').value.trim(); if(!link) return;
+  localStorage.setItem(KEY,JSON.stringify({link,aba:$('iAba').value.trim()||CFG.ABA,abasExtras:$('iAbas').value,seg:+$('iSeg').value||CFG.INTERVALO_SEG}));
+  for(const k in falhaAte) delete falhaAte[k];
+  if(location.search) history.replaceState(null,'',location.pathname);
+  $('dlg').close(); S.upd=null; iniciar();
+};
+$('fDia').onchange=()=>{const v=$('fDia').value; fDiaSel=!v||v===hoje(brNow())?'auto':v; gravaLS('painelF_dia',{v:fDiaSel,em:hoje(brNow())}); diaChave=''; fillFiltros(); render();};
+$('fIni').value=lerLS('painelF_ini',''); $('fFim').value=lerLS('painelF_fim',''); horaOn();
+const mudaHora=()=>{gravaLS('painelF_ini',$('fIni').value); gravaLS('painelF_fim',$('fFim').value); horaOn(); render();};
+$('fIni').onchange=mudaHora; $('fFim').onchange=mudaHora;
+$('fLimpaH').onclick=()=>{$('fIni').value='';$('fFim').value='';mudaHora();};
+$('fHideOk').onchange=()=>{localStorage.setItem('painelHideOk',$('fHideOk').checked?'1':''); tick(true);};
+$('fHideOk').checked=!!localStorage.getItem('painelHideOk');
+addEventListener('resize',()=>tick(true));
+document.addEventListener('visibilitychange',()=>{if(!document.hidden) ler();});
+
+montaRegras(REGRAS_PADRAO,'padrão');
+fillFiltros(); trocaVisao(visao);
+setInterval(()=>tick(false),1000);
+iniciar();
+</script>
+</body>
+</html>

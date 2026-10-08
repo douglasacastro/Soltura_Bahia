@@ -101,12 +101,12 @@ body.v-evo #bar,body.v-evo #warn,body.v-evo #grid,body.v-evo #empty,body.v-evo .
 <div id="empty">Nenhum roteiro para exibir com os filtros atuais.</div>
 <section id="evo" hidden>
   <div class="kpis" id="evoKpis"></div>
-  <div class="painelG"><h2>% de roteiros com “X” no CHECK LIDER, por dia</h2>
+  <div class="painelG"><h2>% de check realizado (“X” no CHECK LIDER), por dia</h2>
     <svg id="evoSvg" role="img" aria-label="Gráfico de linhas da evolução do check do líder por dia"></svg>
     <div class="leg" id="evoLeg"></div>
-    <p class="nota">Base de cada dia: roteiros cujo horário já chegou (ou que já têm “X”). No dia de hoje, horários futuros ainda não entram na conta. Os filtros Gestão, Turno, Garagem e Tipo são aplicados.</p>
+    <p class="nota">Check realizado = “X” na coluna CHECK LIDER. Check não realizado = coluna sem “X”. Base de cada dia: todos os roteiros do dia. Os filtros Gestão, Turno, Garagem e Tipo são aplicados.</p>
   </div>
-  <div class="painelG"><h2>Detalhe por dia e por aba</h2><div style="overflow:auto"><table class="tabEvo" id="evoTab"></table></div></div>
+  <div class="painelG"><h2>Detalhe por dia e por aba <small style="font-weight:400;color:var(--mut)">— realizado (X) / <span class="pct-r">não realizado</span> e % realizado</small></h2><div style="overflow:auto"><table class="tabEvo" id="evoTab"></table></div></div>
 </section>
 <footer><span id="src"></span><span id="upd"></span></footer>
 
@@ -267,10 +267,11 @@ function toDia(v){
   }
   return null;
 }
+const nv=v=>limpa(v).replace(/\s+/g,' ').trim().toUpperCase(); // padroniza nomes de filtro (espaços/maiúsculas)
 const limpa=v=>{const s=String(v??'').trim();return /^\d+\.0+$/.test(s)?s.replace(/\.0+$/,''):s;};
 
 const COLS={dia:['DATA','DIA','DATA SOLTURA','DATA DA SOLTURA','DATA OPERACAO','DATA DA OPERACAO'],cliente:['CLIENTE'],turno:['TURNO'],check:['CHECK LIDER','CHECK LÍDER'],rot:['ROTEIRO','ROTA','LINHA','ITINERARIO','DESTINO','SERVICO'],gar:['GARAGEM'],
-  carro:['CARRO'],sub:['CARRO SUB'],mot:['MOTORISTA'],motSub:['MOTORISTA SUB'],t:['HORARIO DE GARAGEM'],ini:['HORARIO DE INICIO'],
+  carro:['CARRO','VEICULO','VEICULOS'],sub:['CARRO SUB'],mot:['MOTORISTA'],motSub:['MOTORISTA SUB'],t:['HORARIO DE GARAGEM'],ini:['HORARIO DE INICIO'],
   tel:['CONTATO'],obs:['OBSERVACAO'],gestao:['GESTAO']};
 
 function parseTabela(a,op={}){
@@ -290,18 +291,18 @@ function parseTabela(a,op={}){
   const g=(r,k)=>ix[k]<0?'':limpa(r[ix[k]]);
   const rows=[], dias={}; let ultimoDia=null, semData=0;
   for(let i=hi+1;i<a.length;i++){
-    const r=a[i]; const tipo=limpa(r[iTipo]);
+    const r=a[i]; const tipo=nv(r[iTipo]);
     if(ehCab(r)) continue; // cabeçalho repetido no meio da aba
     let t=toSec(g(r,'t')); if(t===null) continue;
     const rot=g(r,'rot')||(extra?(g(r,'cliente')||tipo):''); if(!rot) continue;
-    const turno=g(r,'turno');
+    const turno=nv(g(r,'turno'));
     if(norm(turno).includes('NOITE') && t<CFG.MADRUGADA_ATE*3600) t+=86400;
     // célula de DATA vazia (ex.: células mescladas) herda a data da linha de cima
     let dia=toDia(g(r,'dia'));
     if(dia){ultimoDia=dia;} else {dia=ultimoDia; semData++;}
     if(dia) dias[dia]=(dias[dia]||0)+1;
-    rows.push({dia,turno,ok:norm(g(r,'check'))==='X',rot,gar:g(r,'gar'),carro:g(r,'carro'),sub:g(r,'sub'),
-      mot:g(r,'mot'),motSub:g(r,'motSub'),t,tel:g(r,'tel'),obs:g(r,'obs'),cliente:g(r,'cliente'),gestao:g(r,'gestao'),tipo,aba:op.aba||'',temGestao:ix.gestao>=0});
+    rows.push({dia,turno,ok:norm(g(r,'check'))==='X',rot,gar:nv(g(r,'gar')),carro:g(r,'carro'),sub:g(r,'sub'),
+      mot:g(r,'mot'),motSub:g(r,'motSub'),t,tel:g(r,'tel'),obs:g(r,'obs'),cliente:g(r,'cliente'),gestao:nv(g(r,'gestao')),tipo,aba:op.aba||'',temGestao:ix.gestao>=0});
   }
   const dia=Object.entries(dias).sort((x,y)=>y[1]-x[1])[0]?.[0]||null;
   rows.forEach(r=>{if(!r.dia) r.dia=dia;});
@@ -374,36 +375,49 @@ function gvizMatriz(d){
 
 // ----- Abas extras (TRANSFER / EXTRA): leitura pela POSIÇÃO das colunas, pois os títulos são diferentes -----
 const colIdx=L=>String(L).trim().toUpperCase().charCodeAt(0)-65;
+// Acha a coluna pelo CONTEÚDO (quando o título não vem na leitura ou mudou de lugar):
+// devolve a coluna mais à esquerda cujo nº de acertos é pelo menos metade do melhor.
+function colunaPorConteudo(linhas,teste,excluir=[]){
+  const n=Math.max(0,...linhas.map(r=>r.length)), cont=Array(n).fill(0);
+  for(const r of linhas) for(let j=0;j<n;j++) if(!excluir.includes(j)&&teste(limpa(r[j]))) cont[j]++;
+  const max=Math.max(0,...cont); if(!max) return -1;
+  return cont.findIndex(c=>c>=max*0.5);
+}
 function parseExtra(a,aba){
-  const iTipo=colIdx(CFG.COLUNA_TIPO);
-  const marca=['HORARIO INICIAL','CHECK LIDER','ROTEIRO','TIPO','DATA','GESTAO'];
+  const marca=['HORARIO INICIAL','CHECK LIDER','ROTEIRO','TIPO','DATA','GESTAO','GARAGEM','CARRO','MOTORISTA'];
   const hi=a.findIndex(r=>r.filter(c=>marca.includes(norm(c))).length>=2);
   const H=hi<0?[]:a[hi].map(norm), ix={};
   for(const k in COLS) ix[k]=H.findIndex(h=>COLS[k].map(norm).includes(h));
-  // GESTÃO: pelo título; senão, pela coluna C se ali houver texto que não seja data/hora
-  const iGC=colIdx(CFG.COLUNA_GESTAO);
-  const temGestao=ix.gestao>=0||H[iGC]==='GESTAO';
-  if(ix.gestao<0&&temGestao) ix.gestao=iGC;
-  const desloca=p=>{const i=colIdx(p); return temGestao&&(ix.gestao<=i)?i+1:i;};
-  const pH=H.indexOf('HORARIO INICIAL'), pC=H.findIndex(h=>COLS.check.map(norm).includes(h));
-  const iT=pH>=0?pH:desloca(CFG.EXTRA_COL_HORA), iCk=pC>=0?pC:desloca(CFG.EXTRA_COL_CHECK);
-  const iDia=ix.dia>=0?ix.dia:colIdx(CFG.EXTRA_COL_DATA), cab=hi>=0?a[hi]:[];
+  const amostra=a.slice(hi+1,hi+400);
+  const ehHora=v=>/^\d{1,2}:\d{2}/.test(v), ehDia=v=>!!toDia(v)&&!ehHora(v);
+  // HORÁRIO INICIAL: título; senão a 1ª coluna com horários (vem antes do horário final)
+  let iT=H.findIndex(h=>h==='HORARIO INICIAL'||h.startsWith('HORARIO INIC')||h==='HORA INICIAL');
+  if(iT<0) iT=colunaPorConteudo(amostra,ehHora);
+  // CHECK LIDER: título (ou qualquer título com CHECK); senão a coluna com mais "X"
+  let iCk=H.findIndex(h=>COLS.check.map(norm).includes(h)); if(iCk<0) iCk=H.findIndex(h=>h.includes('CHECK'));
+  if(iCk<0) iCk=colunaPorConteudo(amostra,v=>norm(v)==='X');
+  // DATA: título; senão a coluna com datas
+  const iDia=ix.dia>=0?ix.dia:colunaPorConteudo(amostra,ehDia);
+  // TIPO e GESTÃO: título; senão posição padrão (B e C)
+  const iTipo=H.indexOf('TIPO')>=0?H.indexOf('TIPO'):colIdx(CFG.COLUNA_TIPO);
+  const temGestao=ix.gestao>=0, temGar=ix.gar>=0, cab=hi>=0?a[hi]:[];
   const g=(r,k)=>ix[k]<0?'':limpa(r[ix[k]]);
   const rows=[]; let ultimoDia=null, semData=0;
+  if(iT<0) return {rows,semData,cols:{hora:-1}};
   for(let i=hi+1;i<a.length;i++){
     const r=a[i]; if(!r) continue;
     const t=toSec(limpa(r[iT])); if(t===null) continue;
-    const tipo=limpa(r[iTipo]);
-    let dia=toDia(limpa(r[iDia]));
+    const tipo=nv(r[iTipo]);
+    let dia=iDia<0?null:toDia(limpa(r[iDia]));
     if(dia) ultimoDia=dia; else {dia=ultimoDia; semData++;}
     const rot=g(r,'rot')||g(r,'cliente')||tipo||aba;
     // dica do cursor: todas as colunas preenchidas desta aba, com o título da própria aba
     const campos=r.map((v,j)=>{let x=limpa(v); if(/^\d{1,2}:\d{2}:00$/.test(x)) x=x.slice(0,-3);
       return [limpa(cab[j])||'Coluna '+String.fromCharCode(65+j),x];}).filter(([,x])=>x);
-    rows.push({campos,dia,turno:g(r,'turno'),ok:norm(limpa(r[iCk]))==='X',rot,gar:g(r,'gar'),carro:g(r,'carro'),sub:g(r,'sub'),
-      mot:g(r,'mot'),motSub:g(r,'motSub'),t,tel:g(r,'tel'),obs:g(r,'obs'),cliente:g(r,'cliente'),gestao:g(r,'gestao'),tipo,aba,extra:true,temGestao});
+    rows.push({campos,dia,turno:nv(g(r,'turno')),ok:iCk>=0&&norm(limpa(r[iCk]))==='X',rot,gar:nv(g(r,'gar')),carro:g(r,'carro'),sub:g(r,'sub'),
+      mot:g(r,'mot'),motSub:g(r,'motSub'),t,tel:g(r,'tel'),obs:g(r,'obs'),cliente:g(r,'cliente'),gestao:nv(g(r,'gestao')),tipo,aba,extra:true,temGestao,temGar});
   }
-  return {rows,semData,cols:{hora:iT,check:iCk,gestao:ix.gestao}};
+  return {rows,semData,cols:{hora:iT,check:iCk,gestao:ix.gestao,dia:iDia}};
 }
 const linhasChave=m=>new Set(m.map(r=>r.map(c=>String(c??'').trim())).filter(r=>r.filter(Boolean).length>=3).map(r=>r.join('\u0001')));
 function repetida(mat,base){ // aba inexistente: o Google devolve outra aba no lugar
@@ -445,7 +459,7 @@ async function ler(){
       bases.push(linhasChave(x.mat));
       const res=parseExtra(x.mat,x.aba);
       rows=rows.concat(res.rows); semData+=res.semData; resumo.push(`${x.aba} ${res.rows.length}`);
-      if(!res.rows.length) avisos.push(`aba “${x.aba}”: nenhum horário encontrado na coluna ${CFG.EXTRA_COL_HORA}`);
+      if(!res.rows.length) avisos.push(`aba “${x.aba}”: nenhum horário lido (coluna HORÁRIO INICIAL ${res.cols.hora<0?'não encontrada':'na coluna '+String.fromCharCode(65+res.cols.hora)+' sem horários'})`);
     }
     const dias={}; rows.forEach(r=>{if(r.dia) dias[r.dia]=(dias[r.dia]||0)+1;});
     const dia=Object.entries(dias).sort((x,y)=>y[1]-x[1])[0]?.[0]||null;
@@ -485,13 +499,19 @@ function msRotulo(box){
   b.title=sel.length?sel.join(', '):'Todos';
   box.classList.toggle('on',sel.length>0);
 }
-function msMonta(box,vals){
-  const k=box.dataset.k, todos=[...new Set([...vals,...FSEL[k]])].sort((a,b)=>a.localeCompare(b,'pt',{numeric:true}));
-  const chave=todos.join('\u0001')+'|'+[...FSEL[k]].join('\u0001');
+function msMonta(box,lista,existentes){
+  // lista: valores da data selecionada (com repetição, para contar); existentes: todos os valores da planilha
+  const k=box.dataset.k, cont=new Map(); lista.forEach(v=>cont.set(v,(cont.get(v)||0)+1));
+  if(existentes&&S.upd&&S.rows.length){ // seleção de nome que não existe mais na planilha é descartada
+    let mudou=false; for(const v of [...FSEL[k]]) if(!existentes.has(v)){FSEL[k].delete(v);mudou=true;}
+    if(mudou) salvaFiltro(k);
+  }
+  const todos=[...new Set([...cont.keys(),...FSEL[k]])].sort((a,b)=>a.localeCompare(b,'pt',{numeric:true}));
+  const chave=todos.map(v=>v+':'+(cont.get(v)||0)).join('\u0001')+'|'+[...FSEL[k]].join('\u0001');
   if(msChave[k]!==chave){
     msChave[k]=chave;
-    box.querySelector('.msp').innerHTML=`<div class="msa"><button type="button" data-a="todos">Marcar todos</button><button type="button" data-a="limpa">Limpar</button></div>`+
-      (todos.length?todos.map(v=>`<label class="ck"><input type="checkbox" value="${esc(v)}"${FSEL[k].has(v)?' checked':''}> ${esc(v)}</label>`).join(''):'<div class="vazio">Sem opções na planilha</div>');
+    box.querySelector('.msp').innerHTML=`<div class="msa"><button type="button" data-a="limpa">Mostrar todos</button></div>`+
+      (todos.length?todos.map(v=>`<label class="ck"><input type="checkbox" value="${esc(v)}"${FSEL[k].has(v)?' checked':''}> ${esc(v)} <small style="color:var(--mut)">(${cont.get(v)||0})</small></label>`).join(''):'<div class="vazio">Sem opções na planilha</div>');
   }
   msRotulo(box);
 }
@@ -513,10 +533,11 @@ function fillDias(){
 function fillFiltros(){
   fillDias();
   const da=diaAtivo(), base=S.rows.filter(r=>daData(r,da));
-  msMonta($('fTurno'),[...new Set(base.filter(r=>!r.extra).map(r=>r.turno).filter(Boolean))]);
-  msMonta($('fGar'),[...new Set(base.filter(r=>!r.extra).map(r=>r.gar).filter(Boolean))]);
-  msMonta($('fGestao'),[...new Set(base.map(r=>r.gestao).filter(Boolean))]);
-  msMonta($('fTipo'),[...new Set(base.map(r=>r.tipo).filter(Boolean))]);
+  const ex=(f,rs)=>new Set(rs.map(f).filter(Boolean)), pr=S.rows.filter(r=>!r.extra);
+  msMonta($('fTurno'),base.filter(r=>!r.extra).map(r=>r.turno).filter(Boolean),ex(r=>r.turno,pr));
+  msMonta($('fGar'),base.map(r=>r.gar).filter(Boolean),ex(r=>r.gar,S.rows));
+  msMonta($('fGestao'),base.map(r=>r.gestao).filter(Boolean),ex(r=>r.gestao,S.rows));
+  msMonta($('fTipo'),base.map(r=>r.tipo).filter(Boolean),ex(r=>r.tipo,S.rows));
 }
 function msFecha(box){box.querySelector('.msp').hidden=true;box.querySelector('.msb').setAttribute('aria-expanded','false');}
 document.querySelectorAll('.ms').forEach(box=>{
@@ -571,14 +592,14 @@ const fmtPct=x=>x==null?'—':(x*100).toFixed(1).replace('.',',')+'%';
 const clsPct=x=>x==null?'':x>=.95?'pct-b':x>=.8?'pct-m':'pct-r';
 function dadosEvo(){
   const tu=FSEL.turno, ga=FSEL.gar, ti=FSEL.tipo, ge=FSEL.gestao, now=brNow();
-  const rows=S.rows.filter(r=>r.dia&&(!tu.size||r.extra||tu.has(r.turno))&&(!ga.size||r.extra||ga.has(r.gar))&&(!ti.size||ti.has(r.tipo))&&(!ge.size||!r.temGestao||ge.has(r.gestao)));
+  const rows=S.rows.filter(r=>r.dia&&(!tu.size||r.extra||tu.has(r.turno))&&(!ga.size||(r.extra&&!r.temGar)||ga.has(r.gar))&&(!ti.size||ti.has(r.tipo))&&(!ge.size||!r.temGestao||ge.has(r.gestao)));
   const dias=[...new Set(rows.map(r=>r.dia))].sort(), abas=[...new Set(rows.map(r=>r.aba))];
-  const conta={}; // conta[aba|'Geral'][dia]={ok,base,total}
+  // check realizado = "X" na coluna CHECK LIDER; check não realizado = coluna sem "X"
+  const conta={}; // conta[aba|'Geral'][dia]={ok,base}  (base = todos os roteiros do dia)
   for(const r of rows){
-    const venceu=restante(r,now)<=0;
     for(const k of [r.aba,'Geral']){
-      const c=((conta[k]=conta[k]||{})[r.dia]=conta[k][r.dia]||{ok:0,base:0,total:0});
-      c.total++; if(venceu||r.ok){c.base++; if(r.ok) c.ok++;}
+      const c=((conta[k]=conta[k]||{})[r.dia]=conta[k][r.dia]||{ok:0,base:0});
+      c.base++; if(r.ok) c.ok++;
     }
   }
   return {dias,abas,conta,hoje:hoje(now)};
@@ -591,11 +612,12 @@ function desenhaEvo(){
   const soma=k=>dias.reduce((a,d)=>{const c=conta[k]&&conta[k][d];if(c){a.ok+=c.ok;a.base+=c.base;}return a;},{ok:0,base:0});
   const g=soma('Geral'), cH=conta.Geral&&conta.Geral[h], dAnt=dias.filter(d=>d<h).pop(), cA=dAnt&&conta.Geral[dAnt];
   $('evoKpis').innerHTML=[
-    ['Geral do período',g.base?g.ok/g.base:null,`${g.ok} de ${g.base}`],
+    ['% check realizado no período',g.base?g.ok/g.base:null,`${g.ok} de ${g.base}`],
+    ['Check realizado (com X)',null,'no período',g.ok,'pct-b'],
+    ['Check não realizado (sem X)',null,'no período',g.base-g.ok,'pct-r'],
     [`Hoje (${brData(h).slice(0,5)})`,cH&&cH.base?cH.ok/cH.base:null,cH?`${cH.ok} de ${cH.base}`:'sem roteiros'],
-    [dAnt?`Dia anterior (${brData(dAnt).slice(0,5)})`:'Dia anterior',cA&&cA.base?cA.ok/cA.base:null,cA?`${cA.ok} de ${cA.base}`:'—'],
-    ['Sem “X” no período',null,'',g.base-g.ok]
-  ].map(([t,v,sub,n])=>`<div class="kpi"><span>${esc(t)}</span><b class="${n==null?clsPct(v):''}">${n==null?fmtPct(v):n}</b><small>${esc(sub)}</small></div>`).join('');
+    [dAnt?`Dia anterior (${brData(dAnt).slice(0,5)})`:'Dia anterior',cA&&cA.base?cA.ok/cA.base:null,cA?`${cA.ok} de ${cA.base}`:'—']
+  ].map(([t,v,sub,n,cl])=>`<div class="kpi"><span>${esc(t)}</span><b class="${n==null?clsPct(v):cl}">${n==null?fmtPct(v):n}</b><small>${esc(sub)}</small></div>`).join('');
   // gráfico
   const W=Math.max(320,svg.clientWidth||800), Hh=360, m={l:48,r:20,t:22,b:34}, iw=W-m.l-m.r, ih=Hh-m.t-m.b;
   svg.setAttribute('viewBox',`0 0 ${W} ${Hh}`);
@@ -610,7 +632,7 @@ function desenhaEvo(){
     dias.forEach((d,i)=>{const v=pct(s.nome,d); if(v==null){return;}
       path+=(path?'L':'M')+x(i).toFixed(1)+','+y(v).toFixed(1);
       const c=conta[s.nome][d];
-      pts+=`<circle cx="${x(i)}" cy="${y(v)}" r="${s.nome==='Geral'?5:4}" fill="${s.cor}" stroke="#0f172a" stroke-width="1.5"><title>${brData(d)} · ${esc(s.nome)}: ${c.ok} de ${c.base} com X (${fmtPct(v)})${c.total>c.base?` · ${c.total-c.base} ainda não chegaram no horário`:''}</title></circle>`;
+      pts+=`<circle cx="${x(i)}" cy="${y(v)}" r="${s.nome==='Geral'?5:4}" fill="${s.cor}" stroke="#0f172a" stroke-width="1.5"><title>${brData(d)} · ${esc(s.nome)}: ${fmtPct(v)} — realizado (X): ${c.ok} · não realizado: ${c.base-c.ok} · total: ${c.base}</title></circle>`;
       if(s.nome==='Geral') pts+=`<text class="lbl" x="${x(i)}" y="${y(v)-10}" text-anchor="middle">${fmtPct(v)}</text>`;
     });
     o+=`<path d="${path}" fill="none" stroke="${s.cor}" stroke-width="${s.larg}" stroke-linejoin="round" stroke-linecap="round"/>`+pts;
@@ -619,7 +641,7 @@ function desenhaEvo(){
   $('evoLeg').innerHTML=series.map(s=>`<span><i style="background:${s.cor}"></i>${esc(s.nome)}</span>`).join('');
   // tabela (dia mais recente primeiro)
   const cel=(k,d)=>{const c=conta[k]&&conta[k][d]; if(!c) return '<td>—</td>'; const v=c.base?c.ok/c.base:null;
-    return `<td title="${c.total} roteiros no dia">${c.ok}/${c.base} <b class="${clsPct(v)}">${fmtPct(v)}</b></td>`;};
+    return `<td title="Realizado (X): ${c.ok} · Não realizado: ${c.base-c.ok} · Total: ${c.base}">${c.ok} <span class="pct-r">/ ${c.base-c.ok}</span> <b class="${clsPct(v)}">${fmtPct(v)}</b></td>`;};
   $('evoTab').innerHTML=`<thead><tr><th>Data</th>${abas.map(a=>`<th>${esc(a)}</th>`).join('')}<th>Geral</th></tr></thead><tbody>`+
     dias.slice().reverse().map(d=>`<tr><td>${brData(d)}${d===h?' (hoje)':''}</td>${abas.map(a=>cel(a,d)).join('')}${cel('Geral',d)}</tr>`).join('')+'</tbody>';
 }
@@ -627,7 +649,7 @@ function desenhaEvo(){
 function render(){
   if(visao==='evo'){ head(); desenhaEvo(); return; }
   const tu=FSEL.turno, ga=FSEL.gar, ti=FSEL.tipo, ge=FSEL.gestao, da=diaAtivo();
-  view=S.rows.filter(r=>daData(r,da)&&(!tu.size||r.extra||tu.has(r.turno))&&(!ga.size||r.extra||ga.has(r.gar))&&(!ti.size||ti.has(r.tipo))&&(!ge.size||!r.temGestao||ge.has(r.gestao))&&noIntervalo(r))
+  view=S.rows.filter(r=>daData(r,da)&&(!tu.size||r.extra||tu.has(r.turno))&&(!ga.size||(r.extra&&!r.temGar)||ga.has(r.gar))&&(!ti.size||ti.has(r.tipo))&&(!ge.size||!r.temGestao||ge.has(r.gestao))&&noIntervalo(r))
     .sort((a,b)=>(a.dia||'').localeCompare(b.dia||'')||a.t-b.t||a.rot.localeCompare(b.rot,'pt',{numeric:true}));
   $('bar').innerHTML=ST.map(([k,n])=>`<div class="cnt${fSt===k?' sel':''}" data-s="${k}" tabindex="0"><span>${n}</span><b id="c_${k}">0</b></div>`).join('')+
     `<div class="cnt${fSt?'':' sel'}" data-s="tot" tabindex="0" title="Total de roteiros da data selecionada (com os filtros aplicados). Clique para mostrar todos."><span>Total do dia</span><b id="c_tot">0</b></div>`;
